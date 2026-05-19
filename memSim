@@ -25,6 +25,55 @@ VALID_FRAME_RANGE = range(1, 257)
 
 BACKING_STORE_FILEPATH = "BACKING_STORE.bin"
 
+
+class TranslationLookasideBuffer:
+    CAPACITY = 16
+    
+    def __init__(self):
+        self.queue = []
+
+    def enqueue(self, entry):
+        if len(self.queue) >= self.CAPACITY:
+            self.queue.pop(0)
+        
+        self.queue.append(entry)
+
+    def lookup(self, page_number):
+        for entry in self.queue:
+            # Checks if in the queue, and valid bit set to 1
+            # TODO: Once all bits confirmed, make sure valid bit is in correct location, or change the data structure to hold it
+            if page_number in entry and entry[page_number][-1] == 1:
+                # TLB hit
+                return entry[page_number]
+        # TLB miss
+        return None
+
+
+class PageTable:
+    CAPACITY = 256
+
+    def __init__(self):
+        self.table = {}
+        for i in range(self.CAPACITY):
+            self.table[i] = (None, 0)
+    
+    def lookup(self, page_number):
+        # Checks if in table, and valid bit set to 1
+        # TODO: Once all bits confirmed, make sure valid bit is in correct location, or change the data structure to hold it
+        if page_number in self.table and self.table[page_number][-1] == 1:
+            # Page table hit
+            return self.table[page_number]
+        else:
+            # Page table miss
+            return None
+    
+    # This will alter the page table entry for targeted page
+    # TODO: Confirm what info should contain
+    def update(self, target_page, info: tuple):
+        self.table[target_page] = info
+        # TODO: May need to set bits here too as well
+
+
 def handle_args() -> tuple[str, int, str]:
     """
     This function ensures the required arguments are provided,
@@ -57,19 +106,6 @@ def handle_args() -> tuple[str, int, str]:
     return filepath, frames, pra
 
 
-def main():
-    filepath, frames, pra = handle_args()
-    print(f"Running with {filepath=} {frames=} {pra=}") # Debug line: remove me later
-
-    with open(filepath, "rb") as file:
-        # TODO: Eventually do stuff with each virtual address
-        for line in file:
-            address = file.readline().strip()
-            print(address)
-
-    backing_contents = read_backing()
-
-
 def read_backing():
     if not os.path.isfile(BACKING_STORE_FILEPATH):
         print("'{filepath}' does not exist")
@@ -89,6 +125,21 @@ def read_backing():
             backing_contents.append(row)
 
     return backing_contents
-          
+
+
+def main():
+    filepath, frames, pra = handle_args()
+    print(f"Running with {filepath=} {frames=} {pra=}") # Debug line: remove me later
+    backing_store = read_backing()
+    tlb = TranslationLookasideBuffer()
+    page_table = PageTable()
+
+    with open(filepath, "rb") as file:
+        # TODO: Eventually do stuff with each virtual address
+        for line in file:
+            address = file.readline().strip()
+            print(address)
+    
+
 if __name__ == "__main__":
     main()
