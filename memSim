@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import sys
 import os
 
@@ -22,6 +23,7 @@ PRA_OPTIONS = {
 
 VALID_FRAME_RANGE = range(1, 257)
 
+BACKING_STORE_FILEPATH = "BACKING_STORE.bin"
 
 def handle_args() -> tuple[str, int, str]:
     """
@@ -65,6 +67,28 @@ def main():
             address = file.readline().strip()
             print(address)
 
+    backing_contents = read_backing()
 
+
+def read_backing():
+    if not os.path.isfile(BACKING_STORE_FILEPATH):
+        print("'{filepath}' does not exist")
+        exit()
+    
+    backing_contents = []
+
+    with open(BACKING_STORE_FILEPATH, 'rb') as file:
+        row = file.read(256)
+        backing_contents.append(row)
+
+        while row:
+            # extract row table (256 bytes)
+            row = file.read(256)
+            if not row:
+                break
+            backing_contents.append(row)
+
+    return backing_contents
+          
 if __name__ == "__main__":
     main()
