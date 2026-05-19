@@ -1,0 +1,70 @@
+import sys
+import os
+
+
+def pra_fifo():
+    pass
+
+
+def pra_lru():
+    pass
+
+
+def pra_opt():
+    pass
+
+
+PRA_OPTIONS = {
+    "fifo": pra_fifo,
+    "lru": pra_lru,
+    "opt": pra_opt
+}
+
+VALID_FRAME_RANGE = range(1, 257)
+
+
+def handle_args() -> tuple[str, int, str]:
+    """
+    This function ensures the required arguments are provided,
+    as well as sets defaults for any optional ones that weren't provided
+    """
+    args = sys.argv
+    argc = len(args)
+    frames, pra = None, None
+
+    if argc < 2 or argc > 4:
+        print("Usage: memSim <reference-sequence-file.txt> <FRAMES> <PRA>")
+        exit()
+
+    filepath = args[1]
+    if not os.path.isfile(filepath):
+        print(f"File '{filepath}' does not exist")
+        exit()
+
+    frames = int(args[2]) if argc >= 3 else 256
+    pra = args[3].lower() if argc == 4 else "fifo"
+
+    if frames not in VALID_FRAME_RANGE:
+        print("<FRAMES> must be between 1-255")
+        exit()
+
+    if pra not in PRA_OPTIONS:
+        print("<PRA> must be 'fifo', 'lru' or 'opt'")
+        exit()
+
+    return filepath, frames, pra
+
+
+def main():
+    filepath, frames, pra = handle_args()
+    print(f"Running with {filepath=} {frames=} {pra=}") # Debug line: remove me later
+
+    with open(filepath, "rb") as file:
+        # TODO: Eventually do stuff with each virtual address
+        for line in file:
+            address = file.readline().strip()
+            print(address)
+
+
+if __name__ == "__main__":
+    main()
