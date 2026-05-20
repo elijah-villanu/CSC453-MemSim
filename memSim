@@ -53,19 +53,17 @@ class PageTable:
     CAPACITY = 256
 
     def __init__(self):
-        self.table = {}
-        for i in range(self.CAPACITY):
-            self.table[i] = (None, 0)
+        # Filling the table with default values
+        self.table = [(None, 0)] * self.CAPACITY
     
     def lookup(self, page_number):
-        # Checks if in table, and valid bit set to 1
+        entry = self.table[page_number]
+        # Checks if the valid bit is set to 1
         # TODO: Once all bits confirmed, make sure valid bit is in correct location, or change the data structure to hold it
-        if page_number in self.table and self.table[page_number][-1] == 1:
-            # Page table hit
-            return self.table[page_number]
-        else:
-            # Page table miss
-            return None
+        if entry[-1] == 1:
+            return entry
+        # Page table miss
+        return None
     
     # This will alter the page table entry for targeted page
     # TODO: Confirm what info should contain
@@ -134,11 +132,13 @@ def main():
     tlb = TranslationLookasideBuffer()
     page_table = PageTable()
 
-    with open(filepath, "rb") as file:
+    with open(filepath, "r") as file:
         # TODO: Eventually do stuff with each virtual address
-        for line in file:
-            address = file.readline().strip()
-            print(address)
+        for i, line in enumerate(file):
+            address = line.strip()
+            page_table.update(i, (bin(int(address)), 0))
+        
+    # TODO: Add to TLB whenever a page miss occurs
     
 
 if __name__ == "__main__":
