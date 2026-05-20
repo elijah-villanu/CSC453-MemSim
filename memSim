@@ -32,19 +32,18 @@ class TranslationLookasideBuffer:
     def __init__(self):
         self.queue = []
 
-    def enqueue(self, entry):
+    def enqueue(self, page_number, frame, loaded):
         if len(self.queue) >= self.CAPACITY:
             self.queue.pop(0)
         
-        self.queue.append(entry)
+        self.queue.append({"page": page_number, "frame": frame, "loaded": loaded})
 
     def lookup(self, page_number):
         for entry in self.queue:
-            # Checks if in the queue, and valid bit set to 1
-            # TODO: Once all bits confirmed, make sure valid bit is in correct location, or change the data structure to hold it
-            if page_number in entry and entry[page_number][-1] == 1:
+            # Checks if in the queue, and valid bit set
+            if entry["page"] == page_number and entry["loaded"]:
                 # TLB hit
-                return entry[page_number]
+                return entry["frame"]
         # TLB miss
         return None
 
@@ -53,22 +52,22 @@ class PageTable:
     CAPACITY = 256
 
     def __init__(self):
+        self.table = []
         # Filling the table with default values
-        self.table = [(None, 0)] * self.CAPACITY
-    
+        for _ in range(self.CAPACITY):
+            self.table.append({"frame": None, "loaded": False})
+
     def lookup(self, page_number):
         entry = self.table[page_number]
-        # Checks if the valid bit is set to 1
-        # TODO: Once all bits confirmed, make sure valid bit is in correct location, or change the data structure to hold it
-        if entry[-1] == 1:
+        # Page table hit
+        if entry["loaded"]:
             return entry
         # Page table miss
         return None
     
     # This will alter the page table entry for targeted page
-    # TODO: Confirm what info should contain
-    def update(self, target_page, info: tuple):
-        self.table[target_page] = info
+    def update(self, target_page, frame, loaded):
+        self.table[target_page] = {"frame": frame, "loaded": loaded}
         # TODO: May need to set bits here too as well
 
 
@@ -104,6 +103,15 @@ def handle_args() -> tuple[str, int, str]:
     return filepath, frames, pra
 
 
+def split_virtual_address(addr: int) -> tuple[int, int]:
+    # Shift high bits to right to get only the page bits with their appropriate significance
+    page = addr >> 8
+    # 0xFF has low 8 bits set to 1's and high set to 0's, so & with address to only get the low 8
+    offset = addr & 0xFF
+
+    return page, offset
+
+
 def read_backing():
     if not os.path.isfile(BACKING_STORE_FILEPATH):
         print("'{filepath}' does not exist")
@@ -131,15 +139,21 @@ def main():
     backing_store = read_backing()
     tlb = TranslationLookasideBuffer()
     page_table = PageTable()
+    physical_memory = [None] * frames
 
     with open(filepath, "r") as file:
-        # TODO: Eventually do stuff with each virtual address
-        for i, line in enumerate(file):
-            address = line.strip()
-            page_table.update(i, (bin(int(address)), 0))
-        
-    # TODO: Add to TLB whenever a page miss occurs
-    
+        for address in file:
+            page, offset = split_virtual_address(int(address.strip()))
+            print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
+            # TODO: 
+            # 1. Lookup TLB, if miss, look at page table
+            # 2. If page table miss, page fault and load from backing store into frame, update table
+            # 3. Update TLB that were missed once in page
+            # 4. Get value from physical_memory based on offset and index
+            # 5. Output
+
+            # I think this is the main flow for now, somewhere in 2 I think we'll need our PRA's
+
 
 if __name__ == "__main__":
     main()
