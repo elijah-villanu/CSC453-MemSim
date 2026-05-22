@@ -9,7 +9,6 @@ def pra_fifo(sequence, current_index, frames) -> int:
     # print(f"{sequence=}, {frames=}") # DEBUG
     global oldest_frame
     total_frames = len(frames)
-    print(f"total frames{total_frames}")
 
     # On first page into frame, set oldest to frame 0
     if oldest_frame is None:
@@ -24,8 +23,26 @@ def pra_fifo(sequence, current_index, frames) -> int:
         return frame_to_return
 
 def pra_lru(sequence, current_index, frames) -> int:
-    print(f"{sequence=}, {frames=}") # DEBUG
-    return
+    def victim_frame_index(victim):
+        for frame_index, frame in enumerate(frames):
+            if frame["page"] == victim:
+                return frame_index
+    
+    # Holds all pages that are currently in memory            
+    candidates = [item["page"] for item in frames] 
+
+    for item in sequence[current_index - 1::-1]:
+        previous_page = item["page"]
+        if previous_page in candidates:
+            candidates.remove(previous_page)
+        
+        if (len(candidates) == 1):
+            victim_page = candidates[0]
+            return victim_frame_index(victim_page)
+    
+    # If no page in candidates appear again in the sequence, just replace the first
+    victim_page = candidates[0]
+    return victim_frame_index(victim_page)
 
 def pra_opt(sequence, current_index, frames) -> int:
     def victim_frame_index(victim):
@@ -80,10 +97,15 @@ class TranslationLookasideBuffer:
             # Checks if in the queue, and valid bit set
             if entry["page"] == page_number and entry["loaded"]:
                 # TLB hit
-                return entry["frame"]
+                return entry
         # TLB miss
         return None
-
+    
+    def unload(self, target_page):
+        for entry in self.queue:
+            if entry["page"] == target_page:
+                entry["frame"] = None
+                entry["loaded"] = False
 
 class PageTable:
     CAPACITY = 256
@@ -208,8 +230,6 @@ def main():
 
         # TLB hit
         if frame is not None:
-            print(frame) # TEMP
-
             # Update counter
             tlb_hit_counter += 1
         
@@ -235,6 +255,7 @@ def main():
                 frame = pra(page_list, index, physical_memory)
                 victim_page = physical_memory[frame]["page"]
                 page_table.unload(victim_page)
+                tlb.unload(victim_page)
                 # Update physical_memory frame by looking at backing store
                 physical_memory[frame] = {"page": page, "content": backing_store[page]}
 
