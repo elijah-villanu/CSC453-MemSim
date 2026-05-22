@@ -4,19 +4,21 @@ import os
 import struct
 
 # PRA will return frame to evict from physical memory
-def pra_fifo(sequence, frames) -> int:
+def pra_fifo(sequence, current_index, frames) -> int:
     print(f"{sequence=}, {frames=}") # DEBUG
     return
 
 
-def pra_lru(sequence, frames) -> int:
+def pra_lru(sequence, current_index, frames) -> int:
     print(f"{sequence=}, {frames=}") # DEBUG
     return
 
+def pra_opt(sequence, current_index, frames) -> int:
+    farthest_page = 0
+    for item in sequence[current_index + 1:]:
+        page = item["page"]
 
-def pra_opt(sequence, frames) -> int:
-    print(f"{sequence=}, {frames=}") # DEBUG
-    return
+    return farthest_page
 
 
 PRA_OPTIONS = {
@@ -149,7 +151,7 @@ def main():
     backing_store = read_backing()
     tlb = TranslationLookasideBuffer()
     page_table = PageTable()
-    physical_memory = [{"page": None, "content": None}] * frames
+    physical_memory = []
     page_list = []
 
     page_fault_counter = 0
@@ -162,10 +164,12 @@ def main():
             page, offset = split_virtual_address(int(address.strip()))
             print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
             # Load in each address
-            page_list.append({page, offset})
+            page_list.append({ "page": page, "offset": offset, "visited": False})
             total_addresses += 1
             
-    for page, offset in page_list:
+    for index, item in enumerate(page_list):
+        page, offset = item["page"], item["offset"]
+        item["visited"] = True
         entry = tlb.lookup(page)
         frame = None
         if entry is not None:
@@ -189,17 +193,21 @@ def main():
         
         # Page table miss, page fault occurs
         else:
-            # PRA will determine frame to replace given the full page list (for LRU, OPT)
-            # and the current pages in frame (physical_memory)
-            frame = pra(page_list, physical_memory)
-            victim_page = physical_memory[frame]["page"]
-            page_table.unload(victim_page)
-
-            # Update physical_memory frame by looking at backing store
-            physical_memory[frame] = {"page": page, "content": backing_store[page]}
+            # No PRA needed when memory still has room
+            if len(physical_memory) < frames:
+                physical_memory.append({"page": page, content: backing_store[page]})
+                # Get index frame was just placed
+                frame = len(physical_memory) - 1
+            else:
+                # PRA will determine frame to replace given the full page list (for LRU, OPT)
+                # and the current pages in frame (physical_memory)
+                frame = pra(page_list, index, physical_memory)
+                victim_page = physical_memory[frame]["page"]
+                page_table.unload(victim_page)
+                # Update physical_memory frame by looking at backing store
+                physical_memory[frame] = {"page": page, "content": backing_store[page]}
 
             page_table.update(page, frame, True)
-
             # Update TLB: Add entry to TLB table (and remove stale entries?)
             tlb.enqueue(page, frame, True)
 
