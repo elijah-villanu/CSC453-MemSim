@@ -14,11 +14,28 @@ def pra_lru(sequence, current_index, frames) -> int:
     return
 
 def pra_opt(sequence, current_index, frames) -> int:
-    farthest_page = 0
-    for item in sequence[current_index + 1:]:
-        page = item["page"]
+    def victim_frame_index(victim):
+        for frame_index, frame in enumerate(frames):
+            if frame["page"] == victim:
+                return frame_index
 
-    return farthest_page
+    # Holds all pages that are currently in memory            
+    candidates = [item["page"] for item in frames] 
+
+    # Loop through all upcoming pages to find the 'furthest'
+    for item in sequence[current_index + 1:]:
+        upcoming_page = item["page"]
+        if upcoming_page in candidates:
+            candidates.remove(upcoming_page)
+
+        # Furthest page is left standing, return its frame index
+        if (len(candidates) == 1):
+            victim_page = candidates[0]
+            return victim_frame_index(victim_page)
+    
+    # If no page in candidates appear again in the sequence, just replace the first
+    victim_page = candidates[0]
+    return victim_frame_index(victim_page)
 
 
 PRA_OPTIONS = {
@@ -195,7 +212,7 @@ def main():
         else:
             # No PRA needed when memory still has room
             if len(physical_memory) < frames:
-                physical_memory.append({"page": page, content: backing_store[page]})
+                physical_memory.append({"page": page, "content": backing_store[page]})
                 # Get index frame was just placed
                 frame = len(physical_memory) - 1
             else:
