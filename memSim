@@ -71,7 +71,7 @@ class PageTable:
         self.table[target_page] = {"frame": frame, "loaded": loaded}
         # TODO: May need to set bits here too as well
     
-    #If a page gets removed from a frame, need to update that entry (frame to None and loaded false)
+    # If a page gets removed from a frame, need to update that entry (frame to None and loaded false)
     def unload(self, target_page):
         self.table[target_page] = {"frame": None, "loaded": False}
 
@@ -152,11 +152,13 @@ def main():
             page, offset = split_virtual_address(int(address.strip()))
             print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
             # Load in each address
-            page_list.append(page, offset)
+            page_list.append({page, offset})
             
     for page, offset in page_list:
         entry = tlb.lookup(page)
-        frame = entry["frame"]
+        frame = None
+        if entry is not None:
+            frame = entry["frame"]
 
         # TLB hit
         if frame is not None:
@@ -172,7 +174,7 @@ def main():
         else:
             # PRA will determine frame to replace given the full page list (for LRU, OPT)
             # and the current pages in frame (physical_memory)
-            frame = pra(page_list, physical_memory)
+            # frame = pra(page_list, physical_memory)
             victim_page = physical_memory[frame]["page"]
             page_table.unload(victim_page)
 
