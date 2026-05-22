@@ -3,6 +3,42 @@ import sys
 import os
 import struct
 
+PAGE_TABLE_CAPACITY = 256
+TLB_CAPACITY = 16
+VALID_FRAME_RANGE = range(1, 257)
+BACKING_STORE_FILEPATH = "BACKING_STORE.bin"
+
+# Maps a specified victim page to its index in memory
+def victim_frame_index(victim, frames):
+    for frame_index, frame in enumerate(frames):
+        if frame["page"] == victim:
+            return frame_index
+
+
+def find_victim_from_sequence(sequence_slice, frames):
+    """
+    This is for LRU and OPT algorithms, it takes in a slice of the original sequence which 
+    represents either the past pages (LRU) or the upcoming ones (OPT)
+
+    Returns the index of the frame that will be being replaced
+    """
+    # Holds all pages that are currently in memory            
+    candidates = [item["page"] for item in frames] 
+
+    for item in sequence_slice:
+        previous_page = item["page"]
+        if previous_page in candidates:
+            candidates.remove(previous_page)
+        
+        if (len(candidates) == 1):
+            victim_page = candidates[0]
+            return victim_frame_index(victim_page, frames)
+    
+    # If no page in candidates appear again in the sequence, just replace the first
+    victim_page = candidates[0]
+    return victim_frame_index(victim_page, frames)
+
+
 # PRA will return frame to evict from physical memory
 oldest_frame = None
 def pra_fifo(sequence, current_index, frames) -> int:
@@ -22,48 +58,12 @@ def pra_fifo(sequence, current_index, frames) -> int:
         return frame_to_return
 
 
-def victim_frame_index(victim, frames):
-    for frame_index, frame in enumerate(frames):
-        if frame["page"] == victim:
-            return frame_index
-
-
 def pra_lru(sequence, current_index, frames) -> int:
-    # Holds all pages that are currently in memory            
-    candidates = [item["page"] for item in frames] 
-
-    for item in sequence[current_index - 1::-1]:
-        previous_page = item["page"]
-        if previous_page in candidates:
-            candidates.remove(previous_page)
-        
-        if (len(candidates) == 1):
-            victim_page = candidates[0]
-            return victim_frame_index(victim_page, frames)
-    
-    # If no page in candidates appear again in the sequence, just replace the first
-    victim_page = candidates[0]
-    return victim_frame_index(victim_page, frames)
+    return find_victim_from_sequence(sequence[current_index - 1::-1], frames)
 
 
 def pra_opt(sequence, current_index, frames) -> int:
-    # Holds all pages that are currently in memory            
-    candidates = [item["page"] for item in frames] 
-
-    # Loop through all upcoming pages to find the 'furthest'
-    for item in sequence[current_index + 1:]:
-        upcoming_page = item["page"]
-        if upcoming_page in candidates:
-            candidates.remove(upcoming_page)
-
-        # Furthest page is left standing, return its frame index
-        if (len(candidates) == 1):
-            victim_page = candidates[0]
-            return victim_frame_index(victim_page, frames)
-    
-    # If no page in candidates appear again in the sequence, just replace the first
-    victim_page = candidates[0]
-    return victim_frame_index(victim_page)
+    return find_victim_from_sequence(sequence[current_index + 1:], frames)
 
 
 PRA_OPTIONS = {
@@ -72,19 +72,13 @@ PRA_OPTIONS = {
     "opt": pra_opt
 }
 
-VALID_FRAME_RANGE = range(1, 257)
-
-BACKING_STORE_FILEPATH = "BACKING_STORE.bin"
-
 
 class TranslationLookasideBuffer:
-    CAPACITY = 16
-    
     def __init__(self):
         self.queue = []
 
     def enqueue(self, page_number, frame, loaded):
-        if len(self.queue) >= self.CAPACITY:
+        if len(self.queue) >= TLB_CAPACITY:
             self.queue.pop(0)
         
         self.queue.append({"page": page_number, "frame": frame, "loaded": loaded})
@@ -104,13 +98,12 @@ class TranslationLookasideBuffer:
                 entry["frame"] = None
                 entry["loaded"] = False
 
-class PageTable:
-    CAPACITY = 256
 
+class PageTable:
     def __init__(self):
         self.table = []
         # Filling the table with default values
-        for _ in range(self.CAPACITY):
+        for _ in range(PAGE_TABLE_CAPACITY):
             self.table.append({"frame": None, "loaded": False})
 
     def lookup(self, page_number):
@@ -175,8 +168,11 @@ def split_virtual_address(addr: int) -> tuple[int, int]:
 
 
 def read_backing():
+    """
+    Reads in the contents of the provided backing store and stores the data inside a list
+    """
     if not os.path.isfile(BACKING_STORE_FILEPATH):
-        print("'{filepath}' does not exist")
+        print(f"'{BACKING_STORE_FILEPATH}' does not exist")
         exit()
     
     backing_contents = []
@@ -197,25 +193,28 @@ def read_backing():
 
 def main():
     filepath, frames, pra = handle_args()
-    print(f"Running with {filepath=} {frames=} {pra=}") # Debug line: remove me later
-    backing_store = read_backing()
+
+    # Initializing all our objects we will use
     tlb = TranslationLookasideBuffer()
     page_table = PageTable()
+    backing_store = read_backing()
     physical_memory = []
     page_list = []
 
+    # Counters for output statistics
     page_fault_counter = 0
     tlb_hit_counter = 0
     tlb_miss_counter = 0
     total_addresses = 0
 
+    # Reading in input file and creating the page sequence
     with open(filepath, "r") as file:
         for address in file:
             page, offset = split_virtual_address(int(address.strip()))
             # Load in each address
-            page_list.append({ "address": address, "page": page, "offset": offset, "visited": False})
+            page_list.append({"address": address, "page": page, "offset": offset, "visited": False})
             total_addresses += 1
-            
+    
     for index, item in enumerate(page_list):
         address, page, offset = item["address"], item["page"], item["offset"]
         item["visited"] = True
@@ -226,7 +225,6 @@ def main():
 
         # TLB hit
         if frame is not None:
-            # Update counter
             tlb_hit_counter += 1
         
         # Page table hit
@@ -234,8 +232,6 @@ def main():
             frame = entry["frame"]
             # Update TLB on page table hit
             tlb.enqueue(page, frame, True)
-
-            # Update counter
             tlb_miss_counter += 1
         
         # Page table miss, page fault occurs
@@ -243,24 +239,20 @@ def main():
             # No PRA needed when memory still has room
             if len(physical_memory) < frames:
                 physical_memory.append({"page": page, "content": backing_store[page]})
-                # Get index frame was just placed
+                # Get the index of the frame that was just placed
                 frame = len(physical_memory) - 1
             else:
-                # PRA will determine frame to replace given the full page list (for LRU, OPT)
-                # and the current pages in frame (physical_memory)
+                # Let chosen PRA determine the frame to replace
                 frame = pra(page_list, index, physical_memory)
                 victim_page = physical_memory[frame]["page"]
                 page_table.unload(victim_page)
-                tlb.unload(victim_page)
                 tlb.unload(victim_page)
                 # Update physical_memory frame by looking at backing store
                 physical_memory[frame] = {"page": page, "content": backing_store[page]}
 
             page_table.update(page, frame, True)
-            # Update TLB: Add entry to TLB table (and remove stale entries?)
+            # Update TLB with the new entry
             tlb.enqueue(page, frame, True)
-
-            # Update counters
             tlb_miss_counter += 1
             page_fault_counter += 1
 
@@ -270,17 +262,15 @@ def main():
         # Since in bytes, need to convert
         value = struct.unpack('b', bytes([value_in_bytes]))[0]
         # Remove new line from address and convert content to hex
-        print(f"{address.rstrip()}, {value}, {frame}, {content.hex()}")
+        print(f"{address.rstrip()}, {value}, {frame}, {content.hex().upper()}")
 
     # Output statistics
     print(f"Number of Translated Addresses = {total_addresses}")
     print(f"Page Faults = {page_fault_counter}")
-    print(f"Page Fault rate = {page_fault_counter/total_addresses}")
+    print(f"Page Fault Rate = {page_fault_counter/total_addresses:.3f}")
     print(f"TLB Hits = {tlb_hit_counter}")
     print(f"TLB Misses = {tlb_miss_counter}")
-    print(f"TLB Hit Rate = {tlb_hit_counter/total_addresses}")
-
-        
+    print(f"TLB Hit Rate = {tlb_hit_counter/total_addresses:.3f}")
 
 
 if __name__ == "__main__":
