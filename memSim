@@ -4,10 +4,24 @@ import os
 import struct
 
 # PRA will return frame to evict from physical memory
+oldest_frame = None
 def pra_fifo(sequence, current_index, frames) -> int:
-    print(f"{sequence=}, {frames=}") # DEBUG
-    return
+    # print(f"{sequence=}, {frames=}") # DEBUG
+    global oldest_frame
+    total_frames = len(frames)
+    print(f"total frames{total_frames}")
 
+    # On first page into frame, set oldest to frame 0
+    if oldest_frame is None:
+        oldest_frame = 0
+        return oldest_frame
+
+    # When there exists an oldest frame to exist
+    else:
+        # Mod by total frames for index cycling 
+        frame_to_return = oldest_frame
+        oldest_frame = (oldest_frame + 1) % total_frames
+        return frame_to_return
 
 def pra_lru(sequence, current_index, frames) -> int:
     print(f"{sequence=}, {frames=}") # DEBUG
