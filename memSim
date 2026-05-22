@@ -212,13 +212,12 @@ def main():
     with open(filepath, "r") as file:
         for address in file:
             page, offset = split_virtual_address(int(address.strip()))
-            print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
             # Load in each address
-            page_list.append({ "page": page, "offset": offset, "visited": False})
+            page_list.append({ "address": address, "page": page, "offset": offset, "visited": False})
             total_addresses += 1
             
     for index, item in enumerate(page_list):
-        page, offset = item["page"], item["offset"]
+        address, page, offset = item["address"], item["page"], item["offset"]
         item["visited"] = True
         entry = tlb.lookup(page)
         frame = None
@@ -270,17 +269,9 @@ def main():
         value_in_bytes = content[offset]
         # Since in bytes, need to convert
         value = struct.unpack('b', bytes([value_in_bytes]))[0]
-        print(f"{value}") # TEMP: Need to reformat to the output the assignment is expecting
-        
-        # TODO: 
-        # 1. Lookup TLB, if miss, look at page table (DONE)
-        # 2. If page table miss, page fault and load from backing store into frame, update table
-        # 3. Update TLB that were missed once in page (DONE)
-        # 4. Get value from physical_memory based on offset and index (DONE)
-        # 5. Output
+        # Remove new line from address and convert content to hex
+        print(f"{address.rstrip()}, {value}, {frame}, {content.hex()}")
 
-        # I think this is the main flow for now, somewhere in 2 I think we'll need our PRA's
-    
     # Output statistics
     print(f"Number of Translated Addresses = {total_addresses}")
     print(f"Page Faults = {page_fault_counter}")
