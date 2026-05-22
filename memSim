@@ -4,16 +4,19 @@ import os
 import struct
 
 # PRA will return frame to evict from physical memory
-def pra_fifo() -> int:
-    pass
+def pra_fifo(sequence, frames) -> int:
+    print(f"{sequence=}, {frames=}") # DEBUG
+    return
 
 
-def pra_lru() -> int:
-    pass
+def pra_lru(sequence, frames) -> int:
+    print(f"{sequence=}, {frames=}") # DEBUG
+    return
 
 
-def pra_opt() -> int:
-    pass
+def pra_opt(sequence, frames) -> int:
+    print(f"{sequence=}, {frames=}") # DEBUG
+    return
 
 
 PRA_OPTIONS = {
@@ -95,15 +98,17 @@ def handle_args() -> tuple[str, int, str]:
         exit()
 
     frames = int(args[2]) if argc >= 3 else 256
-    pra = args[3].lower() if argc == 4 else "fifo"
+    pra_choice = args[3].lower() if argc == 4 else "fifo"
 
     if frames not in VALID_FRAME_RANGE:
         print("<FRAMES> must be between 1-255")
         exit()
 
-    if pra not in PRA_OPTIONS:
+    if pra_choice not in PRA_OPTIONS:
         print("<PRA> must be 'fifo', 'lru' or 'opt'")
         exit()
+
+    pra = PRA_OPTIONS[pra_choice]
 
     return filepath, frames, pra
 
