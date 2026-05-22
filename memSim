@@ -147,12 +147,18 @@ def main():
     physical_memory = [{"page": None, "content": None}] * frames
     page_list = []
 
+    page_fault_counter = 0
+    tlb_hit_counter = 0
+    tlb_miss_counter = 0
+    total_addresses = 0
+
     with open(filepath, "r") as file:
         for address in file:
             page, offset = split_virtual_address(int(address.strip()))
             print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
             # Load in each address
             page_list.append({page, offset})
+            total_addresses += 1
             
     for page, offset in page_list:
         entry = tlb.lookup(page)
@@ -163,12 +169,18 @@ def main():
         # TLB hit
         if frame is not None:
             print(frame) # TEMP
+
+            # Update counter
+            tlb_hit_counter += 1
         
         # Page table hit
         elif (entry:=page_table.lookup(page)) is not None:
             frame = entry["frame"]
             # Update TLB on page table hit
             tlb.enqueue(page, frame, True)
+
+            # Update counter
+            tlb_miss_counter += 1
         
         # Page table miss, page fault occurs
         else:
@@ -186,6 +198,10 @@ def main():
             # Update TLB: Add entry to TLB table (and remove stale entries?)
             tlb.enqueue(page, frame, True)
 
+            # Update counters
+            tlb_miss_counter += 1
+            page_fault_counter += 1
+
         # Generate output
         content = physical_memory[frame]["content"]
         value_in_bytes = content[offset]
@@ -201,6 +217,14 @@ def main():
         # 5. Output
 
         # I think this is the main flow for now, somewhere in 2 I think we'll need our PRA's
+    
+    # Output statistics
+    print(f"Number of Translated Addresses = {total_addresses}")
+    print(f"Page Faults = {page_fault_counter}")
+    print(f"Page Fault rate = {page_fault_counter/total_addresses}")
+    print(f"TLB Hits = {tlb_hit_counter}")
+    print(f"TLB Misses = {tlb_miss_counter}")
+    print(f"TLB Hit Rate = {tlb_hit_counter/total_addresses}")
 
         
 
