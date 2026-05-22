@@ -1,17 +1,18 @@
 #!/usr/bin/python3
 import sys
 import os
+import struct
 
-
-def pra_fifo():
+# PRA will return frame to evict from physical memory
+def pra_fifo() -> int:
     pass
 
 
-def pra_lru():
+def pra_lru() -> int:
     pass
 
 
-def pra_opt():
+def pra_opt() -> int:
     pass
 
 
@@ -69,6 +70,10 @@ class PageTable:
     def update(self, target_page, frame, loaded):
         self.table[target_page] = {"frame": frame, "loaded": loaded}
         # TODO: May need to set bits here too as well
+    
+    #If a page gets removed from a frame, need to update that entry (frame to None and loaded 0)
+    def unload(self, target_page):
+        self.table[target_page] = {"frame": None, "loaded": 0}
 
 
 def handle_args() -> tuple[str, int, str]:
@@ -139,20 +144,62 @@ def main():
     backing_store = read_backing()
     tlb = TranslationLookasideBuffer()
     page_table = PageTable()
-    physical_memory = [None] * frames
+    physical_memory = [{"page": None, "content": None}] * frames
+    page_list = []
 
     with open(filepath, "r") as file:
         for address in file:
             page, offset = split_virtual_address(int(address.strip()))
             print(f"{address=}, {page=}, {offset}") # Debug line: remove me later
-            # TODO: 
-            # 1. Lookup TLB, if miss, look at page table
-            # 2. If page table miss, page fault and load from backing store into frame, update table
-            # 3. Update TLB that were missed once in page
-            # 4. Get value from physical_memory based on offset and index
-            # 5. Output
+            # Load in each address
+            page_list.append(page, offset)
+            
+    for page, offset in page_list:
+        entry = tlb.lookup(page)
+        frame = entry["frame"]
 
-            # I think this is the main flow for now, somewhere in 2 I think we'll need our PRA's
+        # TLB hit
+        if frame is not None:
+            print(frame) # TEMP
+        
+        # Page table hit
+        elif (entry:=page_table.lookup(page)) is not None:
+            frame = entry["frame"]
+            # Update TLB on page table hit
+            tlb.enqueue(page, frame, 1)
+        
+        # Page table miss, page fault occurs
+        else:
+            # PRA will determine frame to replace given the full page list (for LRU, OPT)
+            # and the current pages in frame (physical_memory)
+            frame = pra(page_list, physical_memory)
+            victim_page = physical_memory[frame]["page"]
+            page_table.unload(victim_page)
+
+            # TODO: Update physical_memory frame by looking at backing store
+
+            page_table.update(page, frame, 1)
+
+            # Update TLB: Add entry to TLB table (and remove stale entries?)
+            tlb.enqueue(page, frame, 1)
+
+        # Generate output
+        content = physical_memory[frame]["content"]
+        value_in_bytes = content[offset]
+        # Since in bytes, need to convert
+        value = struct.unpack('b', bytes([value_in_bytes]))[0]
+        print(f"{value}") # TEMP: Need to reformat to the output the assignment is expecting
+        
+        # TODO: 
+        # 1. Lookup TLB, if miss, look at page table (DONE)
+        # 2. If page table miss, page fault and load from backing store into frame, update table
+        # 3. Update TLB that were missed once in page (DONE)
+        # 4. Get value from physical_memory based on offset and index (DONE)
+        # 5. Output
+
+        # I think this is the main flow for now, somewhere in 2 I think we'll need our PRA's
+
+        
 
 
 if __name__ == "__main__":
