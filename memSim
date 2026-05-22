@@ -6,7 +6,6 @@ import struct
 # PRA will return frame to evict from physical memory
 oldest_frame = None
 def pra_fifo(sequence, current_index, frames) -> int:
-    # print(f"{sequence=}, {frames=}") # DEBUG
     global oldest_frame
     total_frames = len(frames)
 
@@ -22,12 +21,14 @@ def pra_fifo(sequence, current_index, frames) -> int:
         oldest_frame = (oldest_frame + 1) % total_frames
         return frame_to_return
 
+
+def victim_frame_index(victim, frames):
+    for frame_index, frame in enumerate(frames):
+        if frame["page"] == victim:
+            return frame_index
+
+
 def pra_lru(sequence, current_index, frames) -> int:
-    def victim_frame_index(victim):
-        for frame_index, frame in enumerate(frames):
-            if frame["page"] == victim:
-                return frame_index
-    
     # Holds all pages that are currently in memory            
     candidates = [item["page"] for item in frames] 
 
@@ -38,18 +39,14 @@ def pra_lru(sequence, current_index, frames) -> int:
         
         if (len(candidates) == 1):
             victim_page = candidates[0]
-            return victim_frame_index(victim_page)
+            return victim_frame_index(victim_page, frames)
     
     # If no page in candidates appear again in the sequence, just replace the first
     victim_page = candidates[0]
-    return victim_frame_index(victim_page)
+    return victim_frame_index(victim_page, frames)
+
 
 def pra_opt(sequence, current_index, frames) -> int:
-    def victim_frame_index(victim):
-        for frame_index, frame in enumerate(frames):
-            if frame["page"] == victim:
-                return frame_index
-
     # Holds all pages that are currently in memory            
     candidates = [item["page"] for item in frames] 
 
@@ -62,7 +59,7 @@ def pra_opt(sequence, current_index, frames) -> int:
         # Furthest page is left standing, return its frame index
         if (len(candidates) == 1):
             victim_page = candidates[0]
-            return victim_frame_index(victim_page)
+            return victim_frame_index(victim_page, frames)
     
     # If no page in candidates appear again in the sequence, just replace the first
     victim_page = candidates[0]
@@ -255,6 +252,7 @@ def main():
                 frame = pra(page_list, index, physical_memory)
                 victim_page = physical_memory[frame]["page"]
                 page_table.unload(victim_page)
+                tlb.unload(victim_page)
                 tlb.unload(victim_page)
                 # Update physical_memory frame by looking at backing store
                 physical_memory[frame] = {"page": page, "content": backing_store[page]}
