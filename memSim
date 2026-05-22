@@ -71,9 +71,9 @@ class PageTable:
         self.table[target_page] = {"frame": frame, "loaded": loaded}
         # TODO: May need to set bits here too as well
     
-    #If a page gets removed from a frame, need to update that entry (frame to None and loaded 0)
+    #If a page gets removed from a frame, need to update that entry (frame to None and loaded false)
     def unload(self, target_page):
-        self.table[target_page] = {"frame": None, "loaded": 0}
+        self.table[target_page] = {"frame": None, "loaded": False}
 
 
 def handle_args() -> tuple[str, int, str]:
@@ -176,7 +176,8 @@ def main():
             victim_page = physical_memory[frame]["page"]
             page_table.unload(victim_page)
 
-            # TODO: Update physical_memory frame by looking at backing store
+            # Update physical_memory frame by looking at backing store
+            physical_memory[frame] = {"page": page, "content": backing_store[page]}
 
             page_table.update(page, frame, 1)
 
