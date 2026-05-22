@@ -168,23 +168,23 @@ def main():
         elif (entry:=page_table.lookup(page)) is not None:
             frame = entry["frame"]
             # Update TLB on page table hit
-            tlb.enqueue(page, frame, 1)
+            tlb.enqueue(page, frame, True)
         
         # Page table miss, page fault occurs
         else:
             # PRA will determine frame to replace given the full page list (for LRU, OPT)
             # and the current pages in frame (physical_memory)
-            # frame = pra(page_list, physical_memory)
+            frame = pra(page_list, physical_memory)
             victim_page = physical_memory[frame]["page"]
             page_table.unload(victim_page)
 
             # Update physical_memory frame by looking at backing store
             physical_memory[frame] = {"page": page, "content": backing_store[page]}
 
-            page_table.update(page, frame, 1)
+            page_table.update(page, frame, True)
 
             # Update TLB: Add entry to TLB table (and remove stale entries?)
-            tlb.enqueue(page, frame, 1)
+            tlb.enqueue(page, frame, True)
 
         # Generate output
         content = physical_memory[frame]["content"]
