@@ -117,9 +117,8 @@ class PageTable:
     # This will alter the page table entry for targeted page
     def update(self, target_page, frame, loaded):
         self.table[target_page] = {"frame": frame, "loaded": loaded}
-        # TODO: May need to set bits here too as well
     
-    # If a page gets removed from a frame, need to update that entry (frame to None and loaded false)
+    # If a page gets removed from a frame, need to update that entry
     def unload(self, target_page):
         self.table[target_page] = {"frame": None, "loaded": False}
 
